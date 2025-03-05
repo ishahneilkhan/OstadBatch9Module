@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+void main() {
   runApp(MyApp());
 }
 
@@ -12,111 +10,120 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: TodoScreen(),
+      title: 'Flutter CRUD',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: HomePage(),
     );
   }
 }
 
-class TodoScreen extends StatefulWidget {
+class HomePage extends StatefulWidget {
   @override
-  _TodoScreenState createState() => _TodoScreenState();
+  _HomePageState createState() => _HomePageState();
 }
 
-class _TodoScreenState extends State<TodoScreen> {
-  final TextEditingController _taskController = TextEditingController();
-  final CollectionReference tasks = FirebaseFirestore.instance.collection('tasks');
+class _HomePageState extends State<HomePage> {
+  final String apiUrl = 'http://35.73.30.144:2008/api/v1/items';
+  List items = [];
 
-  void _addTask() {
-    if (_taskController.text.isNotEmpty) {
-      tasks.add({'task': _taskController.text, 'timestamp': Timestamp.now()});
-      _taskController.clear();
+  @override
+  void initState() {
+    super.initState();
+    fetchItems();
+  }
+
+  Future<void> fetchItems() async {
+    final response = await http.get(Uri.parse(apiUrl));
+    if (response.statusCode == 200) {
+      setState(() {
+        items = json.decode(response.body);
+      });
     }
   }
 
-  void _updateTask(String id, String newTask) {
-    tasks.doc(id).update({'task': newTask});
+  Future<void> addItem(String name) async {
+    final response = await http.post(
+      Uri.parse(apiUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'name': name}),
+    );
+    if (response.statusCode == 201) {
+      fetchItems();
+    }
   }
 
-  void _deleteTask(String id) {
-    tasks.doc(id).delete();
+  Future<void> updateItem(int id, String name) async {
+    final response = await http.put(
+      Uri.parse('$apiUrl/$id'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'name': name}),
+    );
+    if (response.statusCode == 200) {
+      fetchItems();
+    }
+  }
+
+  Future<void> deleteItem(int id) async {
+    final response = await http.delete(Uri.parse('$apiUrl/$id'));
+    if (response.statusCode == 200) {
+      fetchItems();
+    }
+  }
+
+  void showForm({int? id, String? name}) {
+    TextEditingController controller = TextEditingController(text: name);
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(id == null ? 'Add Item' : 'Edit Item'),
+          content: TextField(controller: controller),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                if (id == null) {
+                  addItem(controller.text);
+                } else {
+                  updateItem(id, controller.text);
+                }
+                Navigator.pop(context);
+              },
+              child: Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Flutter Firebase CRUD')),
-      body: Column(
-        children: [
-          Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Row(
+      appBar: AppBar(title: Text('Flutter CRUD App')),
+      body: ListView.builder(
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          return ListTile(
+            title: Text(items[index]['name']),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _taskController,
-                    decoration: InputDecoration(labelText: 'Enter task'),
-                  ),
+                IconButton(
+                  icon: Icon(Icons.edit),
+                  onPressed: () => showForm(id: items[index]['id'], name: items[index]['name']),
                 ),
                 IconButton(
-                  icon: Icon(Icons.add),
-                  onPressed: _addTask,
+                  icon: Icon(Icons.delete),
+                  onPressed: () => deleteItem(items[index]['id']),
                 ),
               ],
             ),
-          ),
-          Expanded(
-            child: StreamBuilder(
-              stream: tasks.orderBy('timestamp', descending: true).snapshots(),
-              builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-                if (!snapshot.hasData) {
-                  return Center(child: CircularProgressIndicator());
-                }
-                return ListView(
-                  children: snapshot.data!.docs.map((doc) {
-                    return ListTile(
-                      title: Text(doc['task']),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: Icon(Icons.edit),
-                            onPressed: () {
-                              TextEditingController _editController =
-                                  TextEditingController(text: doc['task']);
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: Text('Edit Task'),
-                                  content: TextField(
-                                    controller: _editController,
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      child: Text('Update'),
-                                      onPressed: () {
-                                        _updateTask(doc.id, _editController.text);
-                                        Navigator.pop(context);
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.delete),
-                            onPressed: () => _deleteTask(doc.id),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                );
-              },
-            ),
-          ),
-        ],
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => showForm(),
+        child: Icon(Icons.add),
       ),
     );
   }
