@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:provider/provider.dart';
+import 'package:flutter_crud_app/providers/item_provider.dart';
+import 'package:flutter_crud_app/screens/item_list_screen.dart';
+import 'package:flutter_crud_app/services/api_service.dart';
 
 void main() {
   runApp(MyApp());
@@ -9,121 +11,12 @@ void main() {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter CRUD',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: HomePage(),
-    );
-  }
-}
-
-class HomePage extends StatefulWidget {
-  @override
-  _HomePageState createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  final String apiUrl = 'http://35.73.30.144:2008/api/v1/items';
-  List items = [];
-
-  @override
-  void initState() {
-    super.initState();
-    fetchItems();
-  }
-
-  Future<void> fetchItems() async {
-    final response = await http.get(Uri.parse(apiUrl));
-    if (response.statusCode == 200) {
-      setState(() {
-        items = json.decode(response.body);
-      });
-    }
-  }
-
-  Future<void> addItem(String name) async {
-    final response = await http.post(
-      Uri.parse(apiUrl),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({'name': name}),
-    );
-    if (response.statusCode == 201) {
-      fetchItems();
-    }
-  }
-
-  Future<void> updateItem(int id, String name) async {
-    final response = await http.put(
-      Uri.parse('$apiUrl/$id'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({'name': name}),
-    );
-    if (response.statusCode == 200) {
-      fetchItems();
-    }
-  }
-
-  Future<void> deleteItem(int id) async {
-    final response = await http.delete(Uri.parse('$apiUrl/$id'));
-    if (response.statusCode == 200) {
-      fetchItems();
-    }
-  }
-
-  void showForm({int? id, String? name}) {
-    TextEditingController controller = TextEditingController(text: name);
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(id == null ? 'Add Item' : 'Edit Item'),
-          content: TextField(controller: controller),
-          actions: [
-            ElevatedButton(
-              onPressed: () {
-                if (id == null) {
-                  addItem(controller.text);
-                } else {
-                  updateItem(id, controller.text);
-                }
-                Navigator.pop(context);
-              },
-              child: Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Flutter CRUD App')),
-      body: ListView.builder(
-        itemCount: items.length,
-        itemBuilder: (context, index) {
-          return ListTile(
-            title: Text(items[index]['name']),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: Icon(Icons.edit),
-                  onPressed: () => showForm(id: items[index]['id'], name: items[index]['name']),
-                ),
-                IconButton(
-                  icon: Icon(Icons.delete),
-                  onPressed: () => deleteItem(items[index]['id']),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => showForm(),
-        child: Icon(Icons.add),
+    return ChangeNotifierProvider(
+      create: (_) => ItemProvider(ApiService()),
+      child: MaterialApp(
+        title: 'Flutter CRUD App',
+        theme: ThemeData(primarySwatch: Colors.blue),
+        home: ItemListScreen(),
       ),
     );
   }
