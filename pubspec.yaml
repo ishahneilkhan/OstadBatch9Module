@@ -1,0 +1,17 @@
+name: flutter_crud_app
+description: A simple Flutter CRUD app with API integration
+
+publish_to: 'none' # Remove this line if you want to publish to pub.dev
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.0.4
+  http: ^0.14.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
